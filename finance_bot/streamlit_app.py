@@ -2,9 +2,7 @@ import streamlit as st
 import openai
 from docling.document_converter import DocumentConverter
 from docling.chunking import HybridChunker
-from openai import OpenAI
 from google import genai
-from transformers import AutoTokenizer
 import tiktoken
 import lancedb
 from lancedb.embeddings import get_registry
@@ -13,13 +11,53 @@ from dotenv import load_dotenv
 from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
 import os
 import tempfile
-import io
 import time
 import random
-from typing import Optional
+import re
+from typing import Tuple
 
 # Load environment variables
 load_dotenv()
+
+def detect_input_type(user_input: str) -> Tuple[str, str]:
+    """
+    Detect if the input is a ticker symbol or a question.
+    
+    Returns:
+        Tuple[str, str]: (input_type, normalized_input)
+        - input_type: "ticker" or "question"
+        - normalized_input: cleaned/normalized version of the input
+    """
+    user_input = user_input.strip()
+    
+    # Ticker symbol patterns:
+    # - 1-5 uppercase letters (e.g., AAPL, MSFT, BRK.B, GOOGL)
+    # - May contain a dot for different share classes
+    # - No spaces or special characters except dots
+    ticker_pattern = r'^[A-Z]{1,5}(\.[A-Z]{1,2})?$'
+    
+    # Normalize to uppercase for ticker checking
+    normalized = user_input.upper()
+    
+    if re.match(ticker_pattern, normalized):
+        return "ticker", normalized
+    else:
+        return "question", user_input
+
+def validate_input(user_input: str) -> Tuple[bool, str]:
+    """
+    Validate user input and provide feedback.
+    
+    Returns:
+        Tuple[bool, str]: (is_valid, message)
+    """
+    if not user_input or not user_input.strip():
+        return False, "Please enter a ticker symbol or question."
+    
+    if len(user_input.strip()) < 2:
+        return False, "Input too short. Please enter a valid ticker symbol or question."
+    
+    return True, ""
 
 def exponential_backoff_retry(func, max_retries=5, base_delay=1):
     """Retry function with exponential backoff for rate limiting"""
@@ -207,7 +245,7 @@ def process_uploaded_files(uploaded_files):
         
         if all_chunks:
             # Embed all chunks
-            table = embed_chunks(all_chunks)
+            embed_chunks(all_chunks)
             return True, f"Successfully processed {len(processed_files)} files: {', '.join(processed_files)}"
         else:
             return False, "No documents were successfully processed."
@@ -217,13 +255,13 @@ def process_uploaded_files(uploaded_files):
 
 def main():
     st.set_page_config(
-        page_title="Financial Document Analyzer",
+        page_title="Financial Research Assistant",
         page_icon="📊",
         layout="wide"
     )
     
-    st.title("Financial Document Analyzer 📊")
-    st.subheader("Upload financial statements and ask questions about them")
+    st.title("Financial Research Assistant 📊")
+    st.subheader("Search companies by ticker or question, or upload your own documents")
     
     # Initialize session state
     if "documents_processed" not in st.session_state:
@@ -232,54 +270,116 @@ def main():
         st.session_state.processed_files = []
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "current_company" not in st.session_state:
+        st.session_state.current_company = None
+    if "input_type" not in st.session_state:
+        st.session_state.input_type = None
+    if "user_query" not in st.session_state:
+        st.session_state.user_query = ""
     
     # Main content area
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.header("Upload Documents")
+        st.header("Data Source")
         
-        # File uploader
-        uploaded_files = st.file_uploader(
-            "Choose financial documents",
-            type=['pdf', 'docx', 'xlsx', 'pptx', 'txt'],
-            accept_multiple_files=True,
-            help="Upload financial statements, reports, or any relevant documents"
-        )
+        # Create tabs for different input methods
+        tab1, tab2 = st.tabs(["🔍 Search Company", "📤 Upload Documents"])
         
-        if uploaded_files:
-            st.write(f"**{len(uploaded_files)} file(s) selected:**")
-            for file in uploaded_files:
-                st.write(f"- {file.name}")
-        
-        # Process button
-        if st.button("Process Documents", type="primary"):
-            if uploaded_files:
-                with st.spinner("Processing documents... This may take a moment."):
-                    success, message = process_uploaded_files(uploaded_files)
+        with tab1:
+            st.write("Enter a company ticker symbol or ask a question about a company.")
+            
+            # Text input for ticker or question
+            user_input = st.text_input(
+                "Ticker or Question",
+                placeholder="e.g., AAPL or What is Apple's revenue?",
+                help="Enter a stock ticker (e.g., AAPL, MSFT) or ask a question about a company",
+                key="search_input"
+            )
+            
+            # Display input type detection
+            if user_input:
+                input_type, normalized = detect_input_type(user_input)
+                if input_type == "ticker":
+                    st.info(f"🎯 Detected ticker symbol: **{normalized}**")
+                else:
+                    st.info(f"💬 Detected question: *{user_input}*")
+            
+            # Search & Analyze button
+            search_button = st.button("🚀 Search & Analyze", type="primary", use_container_width=True)
+            
+            if search_button:
+                is_valid, error_msg = validate_input(user_input)
+                
+                if not is_valid:
+                    st.error(error_msg)
+                else:
+                    input_type, normalized = detect_input_type(user_input)
+                    st.session_state.input_type = input_type
+                    st.session_state.user_query = user_input
                     
-                    if success:
-                        st.success(message)
-                        st.session_state.documents_processed = True
-                        # Update with all documents in database
-                        st.session_state.processed_files = [f.name for f in uploaded_files]
-                    else:
-                        st.error(message)
-            else:
-                st.warning("Please upload files first.")
+                    with st.spinner("🔍 Searching for financial documents..."):
+                        # Placeholder for document search functionality (to be implemented)
+                        st.warning("⚠️ Document search functionality will be implemented in the next step.")
+                        st.info(f"Input Type: {input_type}\nNormalized: {normalized if input_type == 'ticker' else user_input}")
+            
+            # Display current search status
+            if st.session_state.current_company:
+                st.success(f"✅ Currently analyzing: **{st.session_state.current_company}**")
+                if st.session_state.processed_files:
+                    st.write("**Documents loaded:**")
+                    for file in st.session_state.processed_files:
+                        st.write(f"- {file}")
         
-        # Status
-        if st.session_state.documents_processed:
-            st.success("✅ Documents are processed and ready for questions!")
-            st.write("**Processed files:**")
-            for file in st.session_state.processed_files:
-                st.write(f"- {file}")
+        with tab2:
+            st.write("Upload your own financial documents for analysis.")
+            
+            # File uploader
+            uploaded_files = st.file_uploader(
+                "Choose financial documents",
+                type=['pdf', 'docx', 'xlsx', 'pptx', 'txt'],
+                accept_multiple_files=True,
+                help="Upload financial statements, reports, or any relevant documents"
+            )
+            
+            if uploaded_files:
+                st.write(f"**{len(uploaded_files)} file(s) selected:**")
+                for file in uploaded_files:
+                    st.write(f"- {file.name}")
+            
+            # Process button
+            if st.button("Process Documents", type="primary", use_container_width=True):
+                if uploaded_files:
+                    with st.spinner("Processing documents... This may take a moment."):
+                        success, message = process_uploaded_files(uploaded_files)
+                        
+                        if success:
+                            st.success(message)
+                            st.session_state.documents_processed = True
+                            # Update with all documents in database
+                            st.session_state.processed_files = [f.name for f in uploaded_files]
+                            st.session_state.current_company = "Custom Upload"
+                        else:
+                            st.error(message)
+                else:
+                    st.warning("Please upload files first.")
+            
+            # Status
+            if st.session_state.documents_processed and st.session_state.current_company == "Custom Upload":
+                st.success("✅ Documents are processed and ready for questions!")
+                st.write("**Processed files:**")
+                for file in st.session_state.processed_files:
+                    st.write(f"- {file}")
     
     with col2:
-        st.header("Chat with Your Documents")
+        # Dynamic header based on current state
+        if st.session_state.current_company:
+            st.header(f"Chat: {st.session_state.current_company}")
+        else:
+            st.header("Financial Analysis Chat")
         
         if not st.session_state.documents_processed:
-            st.info("👈 Please upload and process documents first to start chatting!")
+            st.info("👈 Search for a company or upload documents to start chatting!")
         else:
             # Display chat messages
             chat_container = st.container()
@@ -318,25 +418,40 @@ def main():
     with st.sidebar:
         st.header("About")
         st.write(
-            "This application uses advanced document processing to analyze financial statements. "
-            "Upload your documents and ask questions to get insights from your financial data."
+            "This application uses AI-powered web search and document processing to analyze financial statements. "
+            "Search for companies by ticker symbol, ask questions, or upload your own documents."
         )
         
         st.subheader("How to use:")
+        
+        st.write("**Option 1: Search Company**")
         st.write(
-            "1. Upload your financial documents using the file uploader\n"
-            "2. Click 'Process Documents' to analyze and index the content\n"
-            "3. Ask questions about your documents in natural language\n"
-            "4. Get detailed answers with references to your documents"
+            "1. Enter a ticker symbol (e.g., AAPL) or question\n"
+            "2. Click 'Search & Analyze' to find financial documents\n"
+            "3. Ask questions about the company's financials\n"
+            "4. Get AI-powered analysis and insights"
         )
         
-        st.subheader("Supported file types:")
-        st.write("• PDF files\n• Word documents (.docx)\n• Excel files (.xlsx)\n• PowerPoint files (.pptx)\n• Text files (.txt)")
+        st.write("**Option 2: Upload Documents**")
+        st.write(
+            "1. Upload your financial documents\n"
+            "2. Click 'Process Documents' to analyze content\n"
+            "3. Ask questions about your documents\n"
+            "4. Get detailed answers with references"
+        )
         
-        if st.button("Reset Application"):
+        st.subheader("Supported formats:")
+        st.write("• Ticker symbols (e.g., AAPL, MSFT, BRK.B)\n• Natural language questions\n• PDF, DOCX, XLSX, PPTX, TXT files")
+        
+        st.divider()
+        
+        if st.button("Reset Application", use_container_width=True):
             st.session_state.documents_processed = False
             st.session_state.processed_files = []
             st.session_state.messages = []
+            st.session_state.current_company = None
+            st.session_state.input_type = None
+            st.session_state.user_query = ""
             st.rerun()
 
 if __name__ == "__main__":
