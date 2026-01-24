@@ -176,7 +176,7 @@ class ResearchAgent:
     
     def _extract_citations(self, response_text: str) -> Tuple[str, List[Citation]]:
         """
-        Extract citations from the response text.
+        Extract citations from the response text and remove citation markers.
         
         Args:
             response_text: The raw response from Gemini
@@ -197,6 +197,8 @@ class ResearchAgent:
                 snippet=None,
                 source_type=self._categorize_source(url)
             ))
+        # Remove [Source: ...] markers from cleaned text
+        cleaned_text = re.sub(pattern1, '', cleaned_text)
         
         # Pattern 2: [Title](URL) markdown links
         pattern2 = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
@@ -223,6 +225,18 @@ class ResearchAgent:
                     snippet=None,
                     source_type=self._categorize_source(url)
                 ))
+        
+        # Remove trailing "Sources:" or "References:" sections with citation lists
+        # This captures common patterns like "Sources:\n- [link](url)\n- [link](url)"
+        sources_section_pattern = r'\n*(?:---\s*)?\n*\*{0,2}(?:Sources?|References?|Citations?):?\*{0,2}\s*\n+(?:[-*•]?\s*\[?[^\n]+\]?\(?https?://[^\s\)]+\)?[^\n]*\n*)+$'
+        cleaned_text = re.sub(sources_section_pattern, '', cleaned_text, flags=re.IGNORECASE)
+        
+        # Remove standalone plain URLs on their own lines
+        cleaned_text = re.sub(r'^\s*https?://[^\s]+\s*$', '', cleaned_text, flags=re.MULTILINE)
+        
+        # Clean up extra whitespace and trailing newlines
+        cleaned_text = re.sub(r'\n{3,}', '\n\n', cleaned_text)
+        cleaned_text = cleaned_text.strip()
         
         return cleaned_text, citations
     
