@@ -270,7 +270,7 @@ class ResearchAgent:
             'financialtimes.com', 'ft.com', 'barrons.com',
             'fool.com', 'morningstar.com', 'seekingalpha.com',
             'marketbeat.com', 'nasdaq.com', 'investing.com',
-            'cnn.com/business', 'forbes.com', 'businessinsider.com',
+            'cnn.com', 'forbes.com', 'businessinsider.com',
             'bloomberg', 'reuters', 'wsj', 'cnbc'
         ]):
             return "Financial News"
