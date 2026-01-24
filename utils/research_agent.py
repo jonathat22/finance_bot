@@ -129,6 +129,51 @@ class ResearchAgent:
         
         return "\n".join(context_parts) + "\n\n"
     
+    def _extract_citations_from_grounding(self, response) -> List[Citation]:
+        """
+        Extract citations from Gemini's grounding metadata.
+        
+        Args:
+            response: The full response object from Gemini
+        
+        Returns:
+            List of Citation objects
+        """
+        citations = []
+        
+        try:
+            # Check if response has grounding_metadata
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                
+                if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
+                    grounding_metadata = candidate.grounding_metadata
+                    
+                    # Extract web search results from grounding chunks
+                    if hasattr(grounding_metadata, 'grounding_chunks'):
+                        for chunk in grounding_metadata.grounding_chunks:
+                            if hasattr(chunk, 'web') and chunk.web:
+                                web = chunk.web
+                                url = getattr(web, 'uri', None)
+                                title = getattr(web, 'title', None)
+                                
+                                if url:
+                                    citations.append(Citation(
+                                        title=title or self._get_title_from_url(url),
+                                        url=url,
+                                        snippet=None,
+                                        source_type=self._categorize_source(url)
+                                    ))
+                    
+                    # Also check for web_search_queries for additional context
+                    if hasattr(grounding_metadata, 'web_search_queries'):
+                        self._log(f"Search queries used: {grounding_metadata.web_search_queries}")
+                        
+        except Exception as e:
+            self._log(f"Error extracting grounding metadata: {e}")
+        
+        return citations
+    
     def _extract_citations(self, response_text: str) -> Tuple[str, List[Citation]]:
         """
         Extract citations from the response text.
@@ -185,14 +230,46 @@ class ResearchAgent:
         """Categorize a source based on its URL."""
         url_lower = url.lower()
         
-        if 'sec.gov' in url_lower:
+        # Extract domain for better matching
+        domain_match = re.search(r'https?://(?:www\.)?([^/]+)', url_lower)
+        domain = domain_match.group(1) if domain_match else url_lower
+        
+        # SEC Filing - most specific first
+        if 'sec.gov' in url_lower or 'edgar' in url_lower:
             return "SEC Filing"
-        elif 'investor' in url_lower or 'ir.' in url_lower:
+        
+        # Company IR pages
+        elif any(pattern in url_lower for pattern in [
+            '/investor', '/ir/', 'investor.', 'ir.', '/shareholders', 
+            '/investors', 'investors.', 'corporate.', '/corporate'
+        ]):
             return "Company IR"
-        elif any(news in url_lower for news in ['reuters', 'bloomberg', 'wsj', 'cnbc', 'yahoo']):
-            return "Financial News"
-        elif '.gov' in url_lower:
+        
+        # Government sources
+        elif '.gov' in domain or 'federalreserve' in domain:
             return "Government"
+        
+        # Financial News - check domain names
+        elif any(news_domain in domain for news_domain in [
+            'reuters.com', 'bloomberg.com', 'wsj.com', 'cnbc.com',
+            'yahoo.com', 'finance.yahoo', 'marketwatch.com',
+            'financialtimes.com', 'ft.com', 'barrons.com',
+            'fool.com', 'morningstar.com', 'seekingalpha.com',
+            'marketbeat.com', 'nasdaq.com', 'investing.com',
+            'cnn.com/business', 'forbes.com', 'businessinsider.com',
+            'bloomberg', 'reuters', 'wsj', 'cnbc'
+        ]):
+            return "Financial News"
+        
+        # Research Reports - check for research domains or PDF patterns
+        elif any(pattern in url_lower for pattern in [
+            '/research', '/reports', '.pdf', 'research.', 'report.'
+        ]) and any(research_domain in domain for research_domain in [
+            'goldman', 'morgan', 'jpmorgan', 'wellsfargo', 
+            'citi.com', 'bofa', 'mckinsey', 'deloitte'
+        ]):
+            return "Research Report"
+        
         else:
             return "Other"
     
@@ -239,15 +316,24 @@ class ResearchAgent:
                 ),
                 contents=prompt
             )
-            return response.text
+            return response  # Return full response object
         
         # Make the request with retry logic
-        response_text = exponential_backoff_retry(make_request)
+        response = exponential_backoff_retry(make_request)
+        response_text = response.text
         
         self._log(f"Received response: {len(response_text)} characters")
         
-        # Extract citations from response
-        cleaned_text, citations = self._extract_citations(response_text)
+        # Extract citations from grounding metadata (primary) and text (fallback)
+        citations = self._extract_citations_from_grounding(response)
+        
+        if not citations:
+            # Fallback to text parsing if no grounding metadata
+            self._log("No grounding metadata citations found, trying text parsing")
+            _, citations = self._extract_citations(response_text)
+        
+        # Clean the response text (remove citation markers if present)
+        cleaned_text, _ = self._extract_citations(response_text)
         
         self._log(f"Extracted {len(citations)} citations")
         
