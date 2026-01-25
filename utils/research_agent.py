@@ -8,7 +8,7 @@ import random
 import re
 import time
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from dotenv import load_dotenv
 from google import genai
@@ -112,7 +112,7 @@ class ResearchAgent:
         if self.verbose:
             print(f"[ResearchAgent] {message}")
 
-    def _build_context(self, conversation_history: List[dict] = None) -> str:
+    def _build_context(self, conversation_history: Optional[List[dict]] = None) -> str:
         """
         Build context string from conversation history.
 
@@ -365,7 +365,7 @@ class ResearchAgent:
         return parts[0]
 
     def answer_question(
-        self, question: str, conversation_history: List[dict] = None
+        self, question: str, conversation_history: Optional[List[dict]] = None
     ) -> ResearchAnswer:
         """
         Answer a financial question using web search.
@@ -423,7 +423,7 @@ class ResearchAgent:
         )
 
     def answer_question_simple(
-        self, question: str, conversation_history: List[dict] = None
+        self, question: str, conversation_history: Optional[List[dict]] = None
     ) -> str:
         """
         Simple method that returns just the answer text.
@@ -441,7 +441,7 @@ class ResearchAgent:
 
 def get_research_response(
     question: str,
-    conversation_history: List[dict] = None,
+    conversation_history: Optional[List[dict]] = None,
     include_citations: bool = True,
 ) -> str:
     """

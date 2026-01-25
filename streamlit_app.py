@@ -35,7 +35,7 @@ def display_citations(citations: list[Citation]):
     st.markdown("### 📚 Sources")
 
     # Group citations by source type
-    by_type = {}
+    by_type: dict[str, list[Citation]] = {}
     for citation in citations:
         source_type = citation.source_type or "Other"
         if source_type not in by_type:
