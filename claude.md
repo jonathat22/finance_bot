@@ -325,6 +325,11 @@ Based on IMPLEMENTATION_SUMMARY.md, planned features include:
 - **CI/CD**: GitHub Actions (.github/workflows/ci.yml)
 - **Python Version**: 3.10+ (supports 3.10, 3.11, 3.12)
 
+## Instructions for reporting information to me
+
+- When reporting information to me, be extremely concise. 
+- Sacrifice grammar for the sake of concision.
+
 ---
 
 **Last Updated**: 2026-01-25
