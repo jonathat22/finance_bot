@@ -2,3 +2,6 @@ python-dotenv
 pydantic
 streamlit
 google-genai
+yfinance>=0.2.36
+plotly>=5.18.0
+pandas>=2.0.0
