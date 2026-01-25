@@ -13,7 +13,7 @@ def sample_citation_data():
         "title": "Apple Q4 2024 Earnings Report",
         "url": "https://investor.apple.com/earnings/2024/Q4",
         "snippet": "Apple reports strong Q4 results",
-        "source_type": "Company IR"
+        "source_type": "Company IR",
     }
 
 
@@ -27,10 +27,10 @@ def sample_research_answer_data():
                 "title": "Apple Investor Relations",
                 "url": "https://investor.apple.com",
                 "snippet": "Market capitalization data",
-                "source_type": "Company IR"
+                "source_type": "Company IR",
             }
         ],
-        "confidence": "high"
+        "confidence": "high",
     }
 
 

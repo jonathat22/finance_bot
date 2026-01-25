@@ -8,7 +8,7 @@ from utils.research_agent import (
     ResearchAgent,
     exponential_backoff_retry,
     ConversationMessage,
-    RESEARCH_SYSTEM_PROMPT
+    RESEARCH_SYSTEM_PROMPT,
 )
 from utils.models import Citation, ResearchAnswer
 
@@ -26,10 +26,7 @@ class TestExponentialBackoffRetry:
 
     def test_retry_on_rate_limit(self):
         """Test retry logic on rate limit error."""
-        mock_func = Mock(side_effect=[
-            Exception("429 rate limit"),
-            "success"
-        ])
+        mock_func = Mock(side_effect=[Exception("429 rate limit"), "success"])
 
         result = exponential_backoff_retry(mock_func, max_retries=3, base_delay=0.01)
 
@@ -69,21 +66,17 @@ class TestConversationMessage:
 class TestResearchAgent:
     """Tests for ResearchAgent class."""
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_initialization(self, mock_client):
         """Test ResearchAgent initialization."""
-        agent = ResearchAgent(
-            model="gemini-2.5-flash",
-            temperature=0.1,
-            verbose=True
-        )
+        agent = ResearchAgent(model="gemini-2.5-flash", temperature=0.1, verbose=True)
 
         assert agent.model == "gemini-2.5-flash"
         assert agent.temperature == 0.1
         assert agent.verbose is True
         assert agent.search_tool is not None
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_log_verbose_enabled(self, mock_client):
         """Test that logging works when verbose is enabled."""
         agent = ResearchAgent(verbose=True)
@@ -91,7 +84,7 @@ class TestResearchAgent:
         # Just ensure _log doesn't raise an error
         agent._log("Test message")
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_log_verbose_disabled(self, mock_client):
         """Test that logging is silent when verbose is disabled."""
         agent = ResearchAgent(verbose=False)
@@ -99,7 +92,7 @@ class TestResearchAgent:
         # Just ensure _log doesn't raise an error
         agent._log("Test message")
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_build_context_empty_history(self, mock_client):
         """Test building context with empty history."""
         agent = ResearchAgent()
@@ -107,13 +100,13 @@ class TestResearchAgent:
 
         assert context == ""
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_build_context_with_history(self, mock_client):
         """Test building context with conversation history."""
         agent = ResearchAgent()
         history = [
             {"role": "user", "content": "What is Apple's market cap?"},
-            {"role": "assistant", "content": "Apple's market cap is $3 trillion."}
+            {"role": "assistant", "content": "Apple's market cap is $3 trillion."},
         ]
 
         context = agent._build_context(history)
@@ -122,14 +115,11 @@ class TestResearchAgent:
         assert "User: What is Apple's market cap?" in context
         assert "Assistant: Apple's market cap is $3 trillion." in context
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_build_context_limits_messages(self, mock_client):
         """Test that context only includes last 6 messages."""
         agent = ResearchAgent()
-        history = [
-            {"role": "user", "content": f"Question {i}"}
-            for i in range(10)
-        ]
+        history = [{"role": "user", "content": f"Question {i}"} for i in range(10)]
 
         context = agent._build_context(history)
 
@@ -138,15 +128,17 @@ class TestResearchAgent:
         assert "Question 4" in context
         assert "Question 3" not in context
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_categorize_source_sec_filing(self, mock_client):
         """Test categorizing SEC filing sources."""
         agent = ResearchAgent()
 
-        assert agent._categorize_source("https://www.sec.gov/edgar/10-k") == "SEC Filing"
+        assert (
+            agent._categorize_source("https://www.sec.gov/edgar/10-k") == "SEC Filing"
+        )
         assert agent._categorize_source("https://edgar.sec.gov/file") == "SEC Filing"
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_categorize_source_company_ir(self, mock_client):
         """Test categorizing company IR sources."""
         agent = ResearchAgent()
@@ -155,25 +147,37 @@ class TestResearchAgent:
         assert agent._categorize_source("https://apple.com/investors") == "Company IR"
         assert agent._categorize_source("https://ir.microsoft.com") == "Company IR"
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_categorize_source_government(self, mock_client):
         """Test categorizing government sources."""
         agent = ResearchAgent()
 
-        assert agent._categorize_source("https://www.federalreserve.gov") == "Government"
+        assert (
+            agent._categorize_source("https://www.federalreserve.gov") == "Government"
+        )
         assert agent._categorize_source("https://treasury.gov") == "Government"
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_categorize_source_financial_news(self, mock_client):
         """Test categorizing financial news sources."""
         agent = ResearchAgent()
 
-        assert agent._categorize_source("https://www.reuters.com/article") == "Financial News"
-        assert agent._categorize_source("https://www.bloomberg.com/news") == "Financial News"
-        assert agent._categorize_source("https://www.cnbc.com/markets") == "Financial News"
-        assert agent._categorize_source("https://www.wsj.com/articles") == "Financial News"
+        assert (
+            agent._categorize_source("https://www.reuters.com/article")
+            == "Financial News"
+        )
+        assert (
+            agent._categorize_source("https://www.bloomberg.com/news")
+            == "Financial News"
+        )
+        assert (
+            agent._categorize_source("https://www.cnbc.com/markets") == "Financial News"
+        )
+        assert (
+            agent._categorize_source("https://www.wsj.com/articles") == "Financial News"
+        )
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_categorize_source_other(self, mock_client):
         """Test categorizing unknown sources."""
         agent = ResearchAgent()
@@ -181,7 +185,7 @@ class TestResearchAgent:
         assert agent._categorize_source("https://www.example.com") == "Other"
         assert agent._categorize_source("https://www.randomsite.com") == "Other"
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_get_title_from_url(self, mock_client):
         """Test extracting title from URL."""
         agent = ResearchAgent()
@@ -193,11 +197,13 @@ class TestResearchAgent:
         title = agent._get_title_from_url("https://example.com")
         assert title == "example.com"
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_extract_citations_pattern1(self, mock_client):
         """Test extracting citations with [Source: Title - URL] pattern."""
         agent = ResearchAgent()
-        text = "Apple's market cap is $3T [Source: Apple IR - https://investor.apple.com]"
+        text = (
+            "Apple's market cap is $3T [Source: Apple IR - https://investor.apple.com]"
+        )
 
         cleaned_text, citations = agent._extract_citations(text)
 
@@ -206,7 +212,7 @@ class TestResearchAgent:
         assert citations[0].url == "https://investor.apple.com"
         assert "[Source:" not in cleaned_text
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_extract_citations_pattern2(self, mock_client):
         """Test extracting citations with [Title](URL) markdown pattern."""
         agent = ResearchAgent()
@@ -218,7 +224,7 @@ class TestResearchAgent:
         assert citations[0].title == "Apple Investor Relations"
         assert citations[0].url == "https://investor.apple.com"
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_extract_citations_removes_sources_section(self, mock_client):
         """Test that Sources: section is removed from cleaned text."""
         agent = ResearchAgent()
@@ -234,7 +240,7 @@ Sources:
         assert "Apple's market cap is $3 trillion." in cleaned_text
         assert len(citations) == 2
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_extract_citations_from_grounding(self, mock_client, mock_gemini_response):
         """Test extracting citations from grounding metadata."""
         agent = ResearchAgent()
@@ -245,7 +251,7 @@ Sources:
         assert citations[0].title == "Apple Investor Relations"
         assert citations[0].source_type == "Company IR"
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_answer_question_with_mock(self, mock_client, mock_gemini_response):
         """Test answer_question method with mocked API response."""
         # Setup mock
@@ -260,7 +266,7 @@ Sources:
         assert len(result.citations) > 0
         assert result.confidence in ["high", "medium", "low"]
 
-    @patch('utils.research_agent.genai.Client')
+    @patch("utils.research_agent.genai.Client")
     def test_answer_question_simple(self, mock_client, mock_gemini_response):
         """Test answer_question_simple returns just the answer text."""
         # Setup mock
