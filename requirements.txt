@@ -1,4 +1,4 @@
 python-dotenv
 pydantic
 streamlit
-google-generativeai
+google-genai
