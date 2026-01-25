@@ -4,12 +4,13 @@ Tests for pydantic models in utils.models.
 
 import pytest
 from pydantic import ValidationError
+
 from utils.models import (
     Citation,
+    DocumentSearchResult,
+    FinancialDocument,
     ResearchAnswer,
     SourceType,
-    FinancialDocument,
-    DocumentSearchResult
 )
 
 
@@ -27,10 +28,7 @@ class TestCitation:
 
     def test_citation_minimal(self):
         """Test creating a citation with minimal required fields."""
-        citation = Citation(
-            title="Test Title",
-            url="https://example.com"
-        )
+        citation = Citation(title="Test Title", url="https://example.com")
 
         assert citation.title == "Test Title"
         assert citation.url == "https://example.com"
@@ -59,9 +57,7 @@ class TestResearchAnswer:
 
     def test_research_answer_empty_citations(self):
         """Test research answer with no citations."""
-        answer = ResearchAnswer(
-            answer="This is an answer without citations."
-        )
+        answer = ResearchAnswer(answer="This is an answer without citations.")
 
         assert answer.answer == "This is an answer without citations."
         assert answer.citations == []
@@ -70,10 +66,7 @@ class TestResearchAnswer:
     def test_research_answer_confidence_levels(self):
         """Test different confidence levels."""
         for confidence in ["high", "medium", "low"]:
-            answer = ResearchAnswer(
-                answer="Test answer",
-                confidence=confidence
-            )
+            answer = ResearchAnswer(answer="Test answer", confidence=confidence)
             assert answer.confidence == confidence
 
 
@@ -101,7 +94,7 @@ class TestFinancialDocument:
             source_type="SEC_EDGAR",
             document_type="10-K",
             company_name="Apple Inc.",
-            year="2024"
+            year="2024",
         )
 
         assert doc.url == "https://sec.gov/10-k"
@@ -114,9 +107,7 @@ class TestFinancialDocument:
     def test_financial_document_minimal(self):
         """Test creating a financial document with minimal fields."""
         doc = FinancialDocument(
-            url="https://example.com/doc",
-            title="Test Document",
-            source_type="OTHER"
+            url="https://example.com/doc", title="Test Document", source_type="OTHER"
         )
 
         assert doc.url == "https://example.com/doc"
@@ -138,10 +129,10 @@ class TestDocumentSearchResult:
                 FinancialDocument(
                     url="https://sec.gov/10-k",
                     title="Apple 10-K",
-                    source_type="SEC_EDGAR"
+                    source_type="SEC_EDGAR",
                 )
             ],
-            search_summary="Found 1 document for Apple Inc."
+            search_summary="Found 1 document for Apple Inc.",
         )
 
         assert result.company_identified == "Apple Inc."

@@ -9,7 +9,7 @@ pytest-mock>=3.12.0
 
 # Code Quality
 flake8>=7.0.0
-black>=24.0.0
+black==24.8.0
 isort>=5.13.0
 mypy>=1.8.0
 
