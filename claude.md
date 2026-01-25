@@ -325,10 +325,15 @@ Based on IMPLEMENTATION_SUMMARY.md, planned features include:
 - **CI/CD**: GitHub Actions (.github/workflows/ci.yml)
 - **Python Version**: 3.10+ (supports 3.10, 3.11, 3.12)
 
-## Instructions for reporting information to me
+## Additional Notes
 
 - When reporting information to me, be extremely concise. 
 - Sacrifice grammar for the sake of concision.
+
+- Once a plan for a new feature implementation is ready, make a new branch off of 'develop' first, and implement the plan in this new branch.
+- Branch naming should adopt the following convention:
+   - 'feat/{insert-concise-feature-name}' for new features
+   - 'bugfix/{insert-concise-feature-name}' for bug fixes
 
 ---
 
