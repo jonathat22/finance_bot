@@ -1,0 +1,22 @@
+# Install main dependencies
+-r requirements.txt
+
+# Testing
+pytest>=8.0.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.12.0
+
+# Code Quality
+flake8>=7.0.0
+black==24.8.0
+isort>=5.13.0
+mypy>=1.8.0
+
+# Security
+bandit>=1.7.6
+safety>=3.0.0
+
+# Build tools (for package building)
+build>=1.0.0
+twine>=4.0.0
