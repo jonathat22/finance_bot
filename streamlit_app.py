@@ -6,8 +6,8 @@ A conversational interface for financial research using Gemini with Google Searc
 import streamlit as st
 from dotenv import load_dotenv
 
+from utils.models import Citation, ResearchAnswer
 from utils.research_agent import ResearchAgent
-from utils.models import ResearchAnswer, Citation
 
 # Load environment variables
 load_dotenv()

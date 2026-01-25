@@ -2,8 +2,9 @@
 Pytest configuration and shared fixtures.
 """
 
+from unittest.mock import MagicMock, Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
 
 
 @pytest.fixture

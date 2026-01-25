@@ -4,12 +4,13 @@ Tests for pydantic models in utils.models.
 
 import pytest
 from pydantic import ValidationError
+
 from utils.models import (
     Citation,
+    DocumentSearchResult,
+    FinancialDocument,
     ResearchAnswer,
     SourceType,
-    FinancialDocument,
-    DocumentSearchResult,
 )
 
 

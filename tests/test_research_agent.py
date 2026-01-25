@@ -2,15 +2,17 @@
 Tests for ResearchAgent class.
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+
+from utils.models import Citation, ResearchAnswer
 from utils.research_agent import (
+    RESEARCH_SYSTEM_PROMPT,
+    ConversationMessage,
     ResearchAgent,
     exponential_backoff_retry,
-    ConversationMessage,
-    RESEARCH_SYSTEM_PROMPT,
 )
-from utils.models import Citation, ResearchAnswer
 
 
 class TestExponentialBackoffRetry:

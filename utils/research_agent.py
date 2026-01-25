@@ -4,14 +4,15 @@ Provides fact-based answers with citations from reliable sources.
 """
 
 import os
-import time
 import random
 import re
-from typing import List, Tuple
+import time
 from dataclasses import dataclass
-from google import genai
-from google.genai.types import Tool, GoogleSearch, GenerateContentConfig
+from typing import List, Tuple
+
 from dotenv import load_dotenv
+from google import genai
+from google.genai.types import GenerateContentConfig, GoogleSearch, Tool
 
 from .models import Citation, ResearchAnswer
 
