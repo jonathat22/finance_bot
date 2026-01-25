@@ -7,6 +7,7 @@ import os
 import random
 import re
 import time
+import urllib.parse
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -18,17 +19,70 @@ from .models import Citation, ResearchAnswer
 
 load_dotenv()
 
+# Comprehensive list of financial news domains for source categorization
+FINANCIAL_NEWS_DOMAINS = {
+    # Major Financial News
+    "reuters.com",
+    "bloomberg.com",
+    "wsj.com",
+    "cnbc.com",
+    "marketwatch.com",
+    "ft.com",
+    "financialtimes.com",
+    "barrons.com",
+    "forbes.com",
+    "businessinsider.com",
+    # Financial Data & Analysis
+    "yahoo.com",
+    "seekingalpha.com",
+    "morningstar.com",
+    "fool.com",
+    "investing.com",
+    "nasdaq.com",
+    "marketbeat.com",
+    "thestreet.com",
+    "zacks.com",
+    "benzinga.com",
+    "tipranks.com",
+    "stocknews.com",
+    "gurufocus.com",
+    "simplywall.st",
+    # Business News (with finance sections)
+    "cnn.com",
+    "bbc.com",
+    "nytimes.com",
+    "economist.com",
+    "theguardian.com",
+    "washingtonpost.com",
+    # Regional/International
+    "financialpost.com",
+    "globeandmail.com",
+    "afr.com",
+    "nikkei.com",
+    "scmp.com",
+    "livemint.com",
+    "economictimes.com",
+}
+
 # System prompt for research-focused responses
 RESEARCH_SYSTEM_PROMPT = """
-You are a financial research assistant that provides accurate, fact-based answers 
+You are a financial research assistant that provides accurate, fact-based answers
 to questions about companies, markets, investments, and financial topics.
 
 Your approach:
-1. Search for current, reliable information from authoritative sources
-2. Prioritize SEC filings, company investor relations, and reputable financial news
-3. Provide specific facts with dates/periods when discussing financial data
-4. Cite your sources clearly so users can verify information
-5. Acknowledge uncertainty when information is unclear or conflicting
+1. **PRIORITIZE official financial documents in your searches:**
+   - SEC filings (10-K, 10-Q, 8-K) from sec.gov/edgar
+   - Company investor relations pages for official reports
+   - Verified earnings reports and financial statements
+2. For financial data queries, explicitly search for terms like:
+   - "10-K" or "10-Q" for annual/quarterly reports
+   - "sec.gov edgar" for SEC filings
+   - "investor relations" for company official data
+   - "earnings report" for quarterly results
+3. Prioritize reputable financial news sources
+4. Provide specific facts with dates/periods when discussing financial data
+5. Cite your sources clearly so users can verify information
+6. Acknowledge uncertainty when information is unclear or conflicting
 
 Response format:
 - Start with a direct answer to the question
@@ -268,17 +322,71 @@ class ResearchAgent:
 
         return cleaned_text, citations
 
-    def _categorize_source(self, url: str) -> str:
-        """Categorize a source based on its URL."""
+    def _extract_clean_domain(self, url: str) -> str:
+        """
+        Extract clean domain from URL, handling redirects and tracking.
+
+        Args:
+            url: The URL to extract domain from
+
+        Returns:
+            Base domain (e.g., "yahoo.com" from "finance.yahoo.com")
+        """
         url_lower = url.lower()
 
-        # Extract domain for better matching
-        domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url_lower)
-        domain = domain_match.group(1) if domain_match else url_lower
+        # Handle Google redirect URLs (url?q= pattern)
+        if "google.com/url?" in url_lower:
+            match = re.search(r"[?&](?:q|url)=([^&]+)", url_lower)
+            if match:
+                url_lower = urllib.parse.unquote(match.group(1))
+
+        # Handle AMP URLs (e.g., google.com/amp/s/cnbc.com or google.com/amp/cnbc.com)
+        if "/amp/" in url_lower:
+            # Extract the actual domain from the AMP path
+            # Matches both /amp/s/domain and /amp/domain
+            amp_match = re.search(r"/amp/(?:s/)?([a-z0-9.-]+\.[a-z]{2,})", url_lower)
+            if amp_match:
+                # Reconstruct as a normal URL
+                url_lower = f"https://{amp_match.group(1)}"
+
+        # Handle .amp. subdomains
+        url_lower = re.sub(r"\.amp\.", ".", url_lower)
+
+        # Remove tracking parameters
+        url_lower = re.split(r"[?#]", url_lower)[0]
+
+        # Extract base domain
+        domain_match = re.search(r"https?://(?:www\d?\.)?([^/]+)", url_lower)
+        if not domain_match:
+            return url_lower
+
+        full_domain = domain_match.group(1)
+
+        # Get base domain (e.g., "yahoo.com" from "finance.yahoo.com")
+        parts = full_domain.split(".")
+        if len(parts) >= 2:
+            # Handle .co.uk, .com.au, etc.
+            if len(parts) >= 3 and parts[-2] in ["co", "com", "gov"]:
+                return ".".join(parts[-3:])
+            return ".".join(parts[-2:])
+
+        return full_domain
+
+    def _categorize_source(self, url: str) -> str:
+        """Categorize a source based on its URL."""
+        original_url = url
+        url_lower = url.lower()
+
+        # Extract clean base domain (handles redirects, AMP, tracking params)
+        base_domain = self._extract_clean_domain(url)
+
+        # Log for debugging
+        self._log(f"Categorizing: {original_url[:80]}")
+        self._log(f"  -> Domain: {base_domain}")
 
         # SEC Filing - most specific first
         if "sec.gov" in url_lower or "edgar" in url_lower:
-            return "SEC Filing"
+            category = "SEC Filing"
 
         # Company IR pages
         elif any(
@@ -295,49 +403,22 @@ class ResearchAgent:
                 "/corporate",
             ]
         ):
-            return "Company IR"
+            category = "Company IR"
 
         # Government sources
-        elif ".gov" in domain or "federalreserve" in domain:
-            return "Government"
+        elif ".gov" in base_domain or "federalreserve" in base_domain:
+            category = "Government"
 
-        # Financial News - check domain names
-        elif any(
-            news_domain in domain
-            for news_domain in [
-                "reuters.com",
-                "bloomberg.com",
-                "wsj.com",
-                "cnbc.com",
-                "yahoo.com",
-                "finance.yahoo",
-                "marketwatch.com",
-                "financialtimes.com",
-                "ft.com",
-                "barrons.com",
-                "fool.com",
-                "morningstar.com",
-                "seekingalpha.com",
-                "marketbeat.com",
-                "nasdaq.com",
-                "investing.com",
-                "cnn.com",
-                "forbes.com",
-                "businessinsider.com",
-                "bloomberg",
-                "reuters",
-                "wsj",
-                "cnbc",
-            ]
-        ):
-            return "Financial News"
+        # Financial News - check domain names using expanded list
+        elif base_domain in FINANCIAL_NEWS_DOMAINS:
+            category = "Financial News"
 
         # Research Reports - check for research domains or PDF patterns
         elif any(
             pattern in url_lower
             for pattern in ["/research", "/reports", ".pdf", "research.", "report."]
         ) and any(
-            research_domain in domain
+            research_domain in base_domain
             for research_domain in [
                 "goldman",
                 "morgan",
@@ -349,10 +430,13 @@ class ResearchAgent:
                 "deloitte",
             ]
         ):
-            return "Research Report"
+            category = "Research Report"
 
         else:
-            return "Other"
+            category = "Other"
+
+        self._log(f"  -> Category: {category}")
+        return category
 
     def _get_title_from_url(self, url: str) -> str:
         """Extract a readable title from a URL."""
@@ -363,6 +447,43 @@ class ResearchAgent:
         if len(parts) > 1 and parts[1]:
             return f"{parts[0]} - {parts[1][:50]}"
         return parts[0]
+
+    def _enhance_query_for_financials(self, question: str) -> str:
+        """
+        Enhance query to prioritize financial statements if relevant.
+
+        Args:
+            question: The user's question
+
+        Returns:
+            Enhanced question with search hints if it's about financial data
+        """
+        financial_keywords = [
+            "revenue",
+            "earnings",
+            "profit",
+            "income",
+            "balance sheet",
+            "cash flow",
+            "assets",
+            "liabilities",
+            "dividend",
+            "eps",
+            "financial",
+            "quarterly",
+            "annual",
+            "fiscal",
+            "10-k",
+            "10-q",
+        ]
+
+        question_lower = question.lower()
+
+        # Check if question is about financial data
+        if any(keyword in question_lower for keyword in financial_keywords):
+            return f"{question}\n\n(Prioritize SEC filings, 10-K/10-Q reports, and official investor relations sources)"
+
+        return question
 
     def answer_question(
         self, question: str, conversation_history: Optional[List[dict]] = None
@@ -382,8 +503,9 @@ class ResearchAgent:
         # Build context from conversation history
         context = self._build_context(conversation_history)
 
-        # Construct the prompt
-        prompt = f"{context}Current question: {question}"
+        # Construct the prompt with query enhancement for financial questions
+        enhanced_question = self._enhance_query_for_financials(question)
+        prompt = f"{context}Current question: {enhanced_question}"
 
         def make_request():
             response = self.client.models.generate_content(
