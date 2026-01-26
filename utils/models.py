@@ -1,5 +1,6 @@
+from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -89,3 +90,74 @@ class DocumentSearchResult(BaseModel):
     search_summary: str = Field(
         description="Brief summary of what was searched and found"
     )
+
+
+class CompanyMetrics(BaseModel):
+    """Structured financial metrics for a company from yfinance."""
+
+    ticker: str = Field(description="Stock ticker symbol")
+    company_name: str = Field(description="Full company name")
+    market_cap: Optional[float] = Field(default=None, description="Market cap in USD")
+    pe_ratio: Optional[float] = Field(default=None, description="Trailing P/E ratio")
+    forward_pe: Optional[float] = Field(default=None, description="Forward P/E ratio")
+    eps: Optional[float] = Field(default=None, description="Earnings per share (TTM)")
+    revenue_ttm: Optional[float] = Field(
+        default=None, description="Total revenue (TTM) in USD"
+    )
+    revenue_growth: Optional[float] = Field(
+        default=None, description="Revenue growth rate (decimal)"
+    )
+    profit_margin: Optional[float] = Field(
+        default=None, description="Profit margin (decimal)"
+    )
+    debt_to_equity: Optional[float] = Field(default=None, description="Debt to equity")
+    current_ratio: Optional[float] = Field(default=None, description="Current ratio")
+    dividend_yield: Optional[float] = Field(
+        default=None, description="Dividend yield (decimal)"
+    )
+    fifty_two_week_high: Optional[float] = Field(
+        default=None, description="52-week high price"
+    )
+    fifty_two_week_low: Optional[float] = Field(
+        default=None, description="52-week low price"
+    )
+    current_price: Optional[float] = Field(
+        default=None, description="Current stock price"
+    )
+    data_timestamp: datetime = Field(description="When data was fetched")
+
+
+class HistoricalData(BaseModel):
+    """Time series price/volume data for charting."""
+
+    ticker: str = Field(description="Stock ticker symbol")
+    dates: List[datetime] = Field(description="List of dates")
+    close_prices: List[float] = Field(description="Closing prices")
+    volumes: List[int] = Field(description="Trading volumes")
+
+
+class ChartSpec(BaseModel):
+    """Specification for a chart to generate."""
+
+    chart_type: Literal["bar", "line", "scatter", "grouped_bar"] = Field(
+        description="Type of chart"
+    )
+    title: str = Field(description="Chart title")
+    x_label: Optional[str] = Field(default=None, description="X-axis label")
+    y_label: Optional[str] = Field(default=None, description="Y-axis label")
+    data: Dict[str, Any] = Field(description="Chart data payload")
+
+
+class ComparisonReport(BaseModel):
+    """Full comparison report output."""
+
+    query: str = Field(description="Original user query")
+    companies: List[CompanyMetrics] = Field(description="Metrics for each company")
+    analysis_text: str = Field(description="AI-generated analysis")
+    charts: List[ChartSpec] = Field(
+        default_factory=list, description="Charts to display"
+    )
+    citations: List[Citation] = Field(
+        default_factory=list, description="Supporting citations"
+    )
+    generated_at: datetime = Field(description="Report generation timestamp")
