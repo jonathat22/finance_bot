@@ -136,12 +136,48 @@ class HistoricalData(BaseModel):
     volumes: List[int] = Field(description="Trading volumes")
 
 
+class HistoricalMarginData(BaseModel):
+    """Historical margin data for competitive advantage analysis."""
+
+    ticker: str = Field(description="Stock ticker symbol")
+    company_name: str = Field(description="Full company name")
+    years: List[int] = Field(description="Fiscal years (e.g., [2024, 2023, 2022...])")
+    gross_profit_margins: List[Optional[float]] = Field(
+        description="Gross profit margin by year (decimal, e.g., 0.45 = 45%)"
+    )
+    operating_expense_ratios: List[Optional[float]] = Field(
+        description="Operating expense ratio by year (decimal)"
+    )
+    net_margins: List[Optional[float]] = Field(
+        description="Net profit margin by year (decimal)"
+    )
+    competitive_advantage_gaps: List[Optional[float]] = Field(
+        description="Gross margin minus op expense ratio by year"
+    )
+    data_timestamp: datetime = Field(description="When data was fetched")
+
+    @property
+    def has_consistent_advantage(self) -> bool:
+        """Check if gross margin consistently exceeds operating expense ratio.
+
+        Returns True if gap > 0 for all available years (minimum 3 years required).
+        """
+        gaps = [g for g in self.competitive_advantage_gaps if g is not None]
+        return len(gaps) >= 3 and all(g > 0 for g in gaps)
+
+    @property
+    def average_advantage_gap(self) -> Optional[float]:
+        """Calculate average competitive advantage gap across available years."""
+        gaps = [g for g in self.competitive_advantage_gaps if g is not None]
+        return sum(gaps) / len(gaps) if gaps else None
+
+
 class ChartSpec(BaseModel):
     """Specification for a chart to generate."""
 
-    chart_type: Literal["bar", "line", "scatter", "grouped_bar"] = Field(
-        description="Type of chart"
-    )
+    chart_type: Literal[
+        "bar", "line", "scatter", "grouped_bar", "margin_trend", "advantage_bar"
+    ] = Field(description="Type of chart")
     title: str = Field(description="Chart title")
     x_label: Optional[str] = Field(default=None, description="X-axis label")
     y_label: Optional[str] = Field(default=None, description="Y-axis label")

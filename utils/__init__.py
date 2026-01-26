@@ -4,6 +4,7 @@ from .models import (
     Citation,
     CompanyMetrics,
     ComparisonReport,
+    HistoricalMarginData,
     ResearchAnswer,
     SourceType,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "Citation",
     "CompanyMetrics",
     "ComparisonReport",
+    "HistoricalMarginData",
     "ReportAgent",
     "ResearchAgent",
     "ResearchAnswer",
