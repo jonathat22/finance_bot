@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 
 import yfinance as yf
 
-from utils.models import CompanyMetrics, HistoricalData
+from utils.models import CompanyMetrics, HistoricalData, HistoricalMarginData
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,7 @@ class FinancialDataProvider:
         """
         self._cache: Dict[str, Tuple[CompanyMetrics, float]] = {}
         self._history_cache: Dict[str, Tuple[HistoricalData, float]] = {}
+        self._margin_cache: Dict[str, Tuple[HistoricalMarginData, float]] = {}
         self._cache_ttl = cache_ttl_seconds
         self._verbose = verbose
 
@@ -304,6 +305,131 @@ class FinancialDataProvider:
             logger.error(f"Error fetching history for {ticker}: {e}")
             return None
 
+    def get_historical_margins(
+        self, ticker: str
+    ) -> Tuple[Optional[HistoricalMarginData], Optional[str]]:
+        """Fetch historical margin data from income statement.
+
+        Calculates gross profit margin, operating expense ratio, net margin,
+        and competitive advantage gap (GPM - OER) for each available year.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Tuple of (HistoricalMarginData, error_message). Error is None on success.
+        """
+        ticker = ticker.upper()
+
+        # Check cache
+        if ticker in self._margin_cache:
+            cached_data, cache_time = self._margin_cache[ticker]
+            if self._is_cache_valid(cache_time):
+                self._log(f"Margin cache hit for {ticker}")
+                return cached_data, None
+
+        self._log(f"Fetching margin data for {ticker}")
+
+        try:
+            stock = yf.Ticker(ticker)
+            income_stmt = stock.income_stmt
+
+            if income_stmt is None or income_stmt.empty:
+                return None, f"No income statement data for '{ticker}'"
+
+            # Get company name
+            info = stock.info
+            company_name = info.get("longName", info.get("shortName", ticker))
+
+            # Extract years from columns (yfinance returns dates as column headers)
+            years: List[int] = []
+            gross_profit_margins: List[Optional[float]] = []
+            operating_expense_ratios: List[Optional[float]] = []
+            net_margins: List[Optional[float]] = []
+            competitive_advantage_gaps: List[Optional[float]] = []
+
+            for col in income_stmt.columns:
+                year = col.year if hasattr(col, "year") else int(str(col)[:4])
+                years.append(year)
+
+                # Extract values from income statement
+                total_revenue = self._get_stmt_value(
+                    income_stmt, col, ["Total Revenue", "Revenue"]
+                )
+                gross_profit = self._get_stmt_value(
+                    income_stmt, col, ["Gross Profit"]
+                )
+                operating_expense = self._get_stmt_value(
+                    income_stmt, col, ["Operating Expense", "Total Operating Expenses"]
+                )
+                net_income = self._get_stmt_value(
+                    income_stmt, col, ["Net Income", "Net Income Common Stockholders"]
+                )
+
+                # Calculate margins
+                gpm = None
+                oer = None
+                nm = None
+                gap = None
+
+                if total_revenue and total_revenue > 0:
+                    if gross_profit is not None:
+                        gpm = gross_profit / total_revenue
+                    if operating_expense is not None:
+                        oer = operating_expense / total_revenue
+                    if net_income is not None:
+                        nm = net_income / total_revenue
+
+                    if gpm is not None and oer is not None:
+                        gap = gpm - oer
+
+                gross_profit_margins.append(gpm)
+                operating_expense_ratios.append(oer)
+                net_margins.append(nm)
+                competitive_advantage_gaps.append(gap)
+
+            if not years:
+                return None, f"Could not extract year data for '{ticker}'"
+
+            margin_data = HistoricalMarginData(
+                ticker=ticker,
+                company_name=company_name,
+                years=years,
+                gross_profit_margins=gross_profit_margins,
+                operating_expense_ratios=operating_expense_ratios,
+                net_margins=net_margins,
+                competitive_advantage_gaps=competitive_advantage_gaps,
+                data_timestamp=datetime.now(),
+            )
+
+            # Cache the result
+            self._margin_cache[ticker] = (margin_data, time.time())
+            return margin_data, None
+
+        except Exception as e:
+            logger.error(f"Error fetching margins for {ticker}: {e}")
+            return None, f"Error fetching margin data for '{ticker}': {str(e)}"
+
+    def _get_stmt_value(
+        self, stmt, col, row_names: List[str]
+    ) -> Optional[float]:
+        """Extract a value from income statement by trying multiple row names.
+
+        Args:
+            stmt: Income statement DataFrame
+            col: Column (year) to extract from
+            row_names: List of possible row names to try
+
+        Returns:
+            The value if found, None otherwise
+        """
+        for name in row_names:
+            if name in stmt.index:
+                val = stmt.loc[name, col]
+                if val is not None and not (hasattr(val, "isna") and val.isna()):
+                    return float(val)
+        return None
+
     def get_multiple_companies(
         self, tickers: List[str]
     ) -> Tuple[Dict[str, CompanyMetrics], Dict[str, str]]:
@@ -333,4 +459,5 @@ class FinancialDataProvider:
         """Clear all cached data."""
         self._cache.clear()
         self._history_cache.clear()
+        self._margin_cache.clear()
         self._log("Cache cleared")
