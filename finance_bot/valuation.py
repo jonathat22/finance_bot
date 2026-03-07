@@ -279,7 +279,13 @@ class ValuationAgent:
         if not years or not eps_list:
             return None
 
-        valid_eps = [(y, e) for y, e in zip(years, eps_list) if e is not None]
+        import math
+
+        valid_eps = [
+            (y, e)
+            for y, e in zip(years, eps_list)
+            if e is not None and not (isinstance(e, float) and math.isnan(e))
+        ]
         if not valid_eps:
             return None
 

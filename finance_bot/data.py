@@ -267,8 +267,23 @@ class DataAgent:
             if name in stmt.index:
                 val = stmt.loc[name, col]
                 if val is not None and not (hasattr(val, "isna") and val.isna()):
-                    return float(val)
+                    f = float(val)
+                    if not pd.isna(f):
+                        return f
         return None
+
+
+def _sanitize_for_json(obj):
+    """Replace float NaN/Inf with None for valid JSON output."""
+    import math
+
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
 
 
 def main():
@@ -284,7 +299,7 @@ def main():
         print(json.dumps({"error": error}), file=sys.stderr)
         sys.exit(1)
 
-    print(json.dumps(data, default=str))
+    print(json.dumps(_sanitize_for_json(data), default=str))
 
 
 if __name__ == "__main__":
