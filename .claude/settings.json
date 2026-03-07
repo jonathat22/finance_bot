@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file_path=$(echo $TOOL_INPUT | python3 -c \"import sys,json; print(json.load(sys.stdin).get('file_path',''))\"); if [[ \"$file_path\" == *.py ]]; then python3 -m black --quiet \"$file_path\" 2>/dev/null; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

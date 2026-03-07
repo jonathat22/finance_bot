@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -136,28 +136,3 @@ class HistoricalData(BaseModel):
     volumes: List[int] = Field(description="Trading volumes")
 
 
-class ChartSpec(BaseModel):
-    """Specification for a chart to generate."""
-
-    chart_type: Literal["bar", "line", "scatter", "grouped_bar"] = Field(
-        description="Type of chart"
-    )
-    title: str = Field(description="Chart title")
-    x_label: Optional[str] = Field(default=None, description="X-axis label")
-    y_label: Optional[str] = Field(default=None, description="Y-axis label")
-    data: Dict[str, Any] = Field(description="Chart data payload")
-
-
-class ComparisonReport(BaseModel):
-    """Full comparison report output."""
-
-    query: str = Field(description="Original user query")
-    companies: List[CompanyMetrics] = Field(description="Metrics for each company")
-    analysis_text: str = Field(description="AI-generated analysis")
-    charts: List[ChartSpec] = Field(
-        default_factory=list, description="Charts to display"
-    )
-    citations: List[Citation] = Field(
-        default_factory=list, description="Supporting citations"
-    )
-    generated_at: datetime = Field(description="Report generation timestamp")
